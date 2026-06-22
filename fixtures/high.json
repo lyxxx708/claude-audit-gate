@@ -1,0 +1,1 @@
+{"status":"FAIL","severity":"HIGH","findings":[{"title":"security hole","severity":"HIGH","file":"auth.ts","evidence":"no validation","fix":"add validation"}],"required_fixes":["add validation"],"summary":"critical issue"}

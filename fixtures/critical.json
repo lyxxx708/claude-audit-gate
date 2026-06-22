@@ -1,0 +1,1 @@
+{"status":"FAIL","severity":"CRITICAL","findings":[{"title":"remote code exec","severity":"CRITICAL","file":"server.ts","evidence":"exec(userInput)","fix":"sanitize input"}],"required_fixes":["sanitize input"],"summary":"RCE vulnerability"}

@@ -1,0 +1,1 @@
+{"status":"PASS","severity":"LOW","findings":[{"title":"minor style issue","severity":"LOW","file":"foo.ts","evidence":"inconsistent naming","fix":"rename"}],"required_fixes":["rename"],"summary":"low severity"}

@@ -1,0 +1,23 @@
+{
+  "skills": {
+    "claude-audit": {
+      "prompt": "See .opencode/CLAUDE_AUDIT.md"
+    }
+  },
+  "tools": {
+    "claude_audit": {
+      "path": ".opencode/tools/claude_audit.ts",
+      "description": "Independent Claude Code audit of workspace git diff"
+    }
+  },
+  "commands": {
+    "claude-audit": {
+      "description": "Run Claude Code as independent auditor",
+      "args": [
+        {"name": "--skip-preflight", "type": "boolean", "default": false},
+        {"name": "--skip-claude", "type": "boolean", "default": false},
+        {"name": "--self-test", "type": "boolean", "default": false}
+      ]
+    }
+  }
+}
