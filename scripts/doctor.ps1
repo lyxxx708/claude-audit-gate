@@ -26,7 +26,7 @@ Write-Host ""
 
 # 2. claude auth status (local login metadata)
 Write-Host "-- Step 2: Claude auth status (metadata) ------"
-Write-Host "  Note: only proves local login metadata."
+Write-Host "  Note: only proves local login state / auth metadata."
 Write-Host "  The headless ping (Step 3) is the authoritative runtime check."
 try {
     $authRaw = & claude auth status 2>&1
