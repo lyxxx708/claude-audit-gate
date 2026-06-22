@@ -241,13 +241,17 @@ if ($UseFixture -ne "") {
     # ══════════════════════════════════════════════════════
     # ── Claude audit (normal mode only) ──────────────────
 
-    $auditPrompt = @'
+    $diffContent = Get-Content -LiteralPath $DiffFile -Raw -Encoding utf8
+    if (-not $diffContent) { $diffContent = "(empty)" }
+
+    $auditPrompt = @"
 You are an independent code auditor.
 
-Read .audit/input.diff.
-Do not modify files.
-Do not run destructive commands.
-Audit only the actual diff and relevant repository context.
+Audit the following git diff. Do not modify files. Do not run destructive commands.
+
+```diff
+$diffContent
+```
 
 Return strict JSON:
 {
@@ -267,12 +271,12 @@ Return strict JSON:
   ],
   "summary": "short audit summary"
 }
-'@
+"@
 
-    Write-Host "[claude_audit] invoking Claude Code (max-turns=3, no-session-persistence)..."
+    Write-Host "[claude_audit] invoking Claude Code (max-turns=5, no-session-persistence)..."
 
     # Build base arguments
-    $claudeArgs = @("-p", $auditPrompt, "--output-format", "json", "--max-turns", "3", "--no-session-persistence")
+    $claudeArgs = @("-p", $auditPrompt, "--output-format", "json", "--max-turns", "5", "--no-session-persistence")
 
     # Try --json-schema if supported (Claude Code >= v2.1+)
     $jsonSchemaSupported = $false
@@ -294,7 +298,7 @@ Return strict JSON:
 {"type":"object","properties":{"status":{"type":"string","enum":["PASS","FAIL"]},"severity":{"type":"string","enum":["NONE","LOW","MEDIUM","HIGH","CRITICAL"]},"findings":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string"},"severity":{"type":"string"},"file":{"type":"string"},"evidence":{"type":"string"},"fix":{"type":"string"}},"required":["title","severity","evidence","fix"]}},"required_fixes":{"type":"array","items":{"type":"string"}},"summary":{"type":"string"}},"required":["status","severity","findings","summary"]}
 '@ | Out-File -LiteralPath $schemaFile -Encoding utf8 -Force
         try {
-            $auditRaw = & claude -p $auditPrompt --output-format json --max-turns 3 --no-session-persistence --json-schema $schemaFile 2>&1
+            $auditRaw = & claude -p $auditPrompt --output-format json --max-turns 5 --no-session-persistence --json-schema $schemaFile 2>&1
             $auditExitCode = $LASTEXITCODE
         } catch {
             $auditRaw = $_.Exception.Message
@@ -379,21 +383,25 @@ if (-not $auditObj -or -not $auditObj.status) {
 }
 
 # ── Gate on severity ─────────────────────────────────────
-# Derive severity: explicit top-level field first, else max from findings
-$severity = "NONE"
+# Derive severity: max of top-level field and all findings
+$sepMap = @{ CRITICAL=4; HIGH=3; WARN=2; MEDIUM=2; LOW=1; INFO=0; NONE=0 }
+$maxSv = 0
+$maxLabel = "NONE"
+
+# Top-level severity
 if ($auditObj.severity) {
-    $severity = $auditObj.severity.ToUpper()
-} elseif ($auditObj.findings -and $auditObj.findings.Count -gt 0) {
-    $sevMap = @{ CRITICAL=4; HIGH=3; MEDIUM=2; LOW=1; NONE=0 }
-    $maxSev = 0
-    $maxLabel = "NONE"
+    $tl = $auditObj.severity.ToUpper()
+    if ($sepMap[$tl] -gt $maxSv) { $maxSv = $sepMap[$tl]; $maxLabel = $tl }
+}
+# Findings severity
+if ($auditObj.findings -and $auditObj.findings.Count -gt 0) {
     foreach ($f in $auditObj.findings) {
         $fs = if ($f.severity) { $f.severity.ToUpper() } else { "NONE" }
-        $sv = $sevMap[$fs]
-        if ($sv -gt $maxSev) { $maxSev = $sv; $maxLabel = $fs }
+        $sv = $sepMap[$fs]
+        if ($sv -gt $maxSv) { $maxSv = $sv; $maxLabel = $fs }
     }
-    $severity = $maxLabel
 }
+$severity = $maxLabel
 
 Write-Host "[claude_audit] status=$($auditObj.status) severity=$severity"
 Write-Host "[claude_audit] findings: $($auditObj.findings.Count)"
