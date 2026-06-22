@@ -54,11 +54,23 @@ Start
   ├─ Load ANTHROPIC_API_KEY from env
   ├─ Load ANTHROPIC_AUTH_TOKEN from env
   │
-  ├─ claude auth status
-  │     └─ FAIL → exit 21, suggest "run 'claude' interactively"
+  ├─ claude auth status          ← proves local login metadata exists
+  │     └─ loggedIn=false → exit 21
   │
-  └─ claude -p "reply only: ok" --output-format json
+  └─ claude -p "reply only: ok" --output-format json  ← authoritative runtime check
         ├─ 429 → exit 23 (rate limit)
-        ├─ FAIL → exit 21
+        ├─ 403 → exit 21 (stale session — run `claude` interactive to refresh)
+        ├─ other FAIL → exit 21
         └─ OK  → continue to diff + audit
 ```
+
+**Critical distinction**: `claude auth status` only proves local login metadata exists.
+`claude -p --output-format json` is the authoritative runtime check.
+If auth status says `loggedIn=true` but `claude -p` returns 403, the local session token is
+**stale** — re-authenticate by running `claude` interactively (not `setup-token`).
+
+## Proxy and OAuth bypass
+
+The script sets `NO_PROXY=localhost,127.0.0.1,platform.claude.com,claude.com` by default.
+This allows the OAuth authentication flow (`claude.com`, `platform.claude.com`) to bypass the
+local proxy, which is required for `claude auth login` to succeed.

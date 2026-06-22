@@ -24,8 +24,10 @@ if ($claudePath) {
 }
 Write-Host ""
 
-# 2. claude auth status
-Write-Host "-- Step 2: Claude auth status -----------------"
+# 2. claude auth status (local login metadata)
+Write-Host "-- Step 2: Claude auth status (metadata) ------"
+Write-Host "  Note: only proves local login metadata."
+Write-Host "  The headless ping (Step 3) is the authoritative runtime check."
 try {
     $authRaw = & claude auth status 2>&1
     $authText = [string]$authRaw
@@ -51,16 +53,19 @@ Write-Host ""
 Write-Host "-- Step 3: Headless ping ----------------------"
 $env:HTTP_PROXY  = "http://127.0.0.1:7897"
 $env:HTTPS_PROXY = "http://127.0.0.1:7897"
-$env:NO_PROXY    = "localhost,127.0.0.1"
+$env:NO_PROXY    = "localhost,127.0.0.1,platform.claude.com,claude.com"
 try {
     $pingRaw = & claude -p "reply only: ok" --output-format json 2>&1
     $pingText = [string]$pingRaw
-    if ($pingText -match 'api_error_status.*429') {
-        Write-Host "  WARN: Rate limited (429). Resets 6pm CST."
-    } elseif ($pingText -match '"is_error": false') {
+    if ($pingText -match '"is_error":\s*false') {
         Write-Host "  PASS: Headless ping OK"
+    } elseif ($pingText -match 'api_error_status.*403') {
+        Write-Host "  FAIL: Stale local session (403). Run 'claude' interactively to re-authenticate."
+        $issues++
+    } elseif ($pingText -match 'api_error_status.*429') {
+        Write-Host "  WARN: Rate limited (429). Resets 6pm CST."
     } else {
-        Write-Host "  WARN: Unexpected response"
+        Write-Host "  WARN: Unexpected response (may still work)"
     }
 } catch {
     Write-Host "  WARN: Ping failed: $($_.Exception.Message)"
